@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a0a;
+  --card: #111111;
+  --border: #1a1a1a;
+  --muted: #888888;
+  --text: #ededed;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+input, textarea, select {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  width: 100%;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input:focus, textarea:focus, select:focus { border-color: #333; }
+input::placeholder, textarea::placeholder { color: var(--muted); }
+select option { background: #111; }

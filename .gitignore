@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-error.log*
+
+# Temp / scratch
+lib_temp/
+types_temp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cursor IDE
+.cursor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
