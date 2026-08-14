@@ -29,6 +29,9 @@ types_temp/
 .DS_Store
 Thumbs.db
 
+# MCP config (contains tokens)
+.mcp.json
+
 # Cursor IDE
 .cursor/
 

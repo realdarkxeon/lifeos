@@ -113,52 +113,65 @@ def update_task(task_id: str, data: TaskUpdate, db: Session = Depends(get_db)):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(404, "Task not found")
-    updates = data.model_dump(exclude_unset=True)
 
+    updates = data.model_dump(exclude_unset=True)
     was_completed = task.is_completed
     old_sprint_week = task.sprint_week
     old_cycle_id = task.cycle_id
 
-    if updates.get("is_completed") is True and not was_completed:
-        updates["completed_at"] = datetime.utcnow()
+    going_to_backlog = (
+        updates.get("status") == TaskStatus.backlog
+        and task.status != TaskStatus.backlog
+    )
+    explicit_uncomplete = updates.get("is_completed") is False
 
-    if updates.get("is_completed") is False and was_completed:
-        updates["completed_at"] = None
-        updates.setdefault("status", TaskStatus.sprint)
-        if task.key_result_id and task.kr_value:
-            kr = db.query(KeyResult).filter(KeyResult.id == task.key_result_id).first()
-            if kr:
-                kr.current = max(0.0, (kr.current or 0.0) - task.kr_value)
+    # Single source of truth: task is being uncompleted if either the
+    # client explicitly said so, or it's moving to backlog while it was
+    # previously completed. This fires the KR decrement exactly once.
+    should_uncomplete = was_completed and (explicit_uncomplete or going_to_backlog)
 
-    if updates.get("status") == TaskStatus.backlog and task.status != TaskStatus.backlog:
-        updates["sprint_week"] = None
-        if was_completed:
+    going_to_complete = updates.get("is_completed") is True and not was_completed
+
+    try:
+        if going_to_complete:
+            updates["completed_at"] = datetime.utcnow()
+
+        if should_uncomplete:
             updates["is_completed"] = False
             updates["completed_at"] = None
+            updates.setdefault("status", TaskStatus.sprint if not going_to_backlog else TaskStatus.backlog)
             if task.key_result_id and task.kr_value:
                 kr = db.query(KeyResult).filter(KeyResult.id == task.key_result_id).first()
                 if kr:
                     kr.current = max(0.0, (kr.current or 0.0) - task.kr_value)
 
-    for k, v in updates.items():
-        setattr(task, k, v)
-    db.commit()
+        if going_to_backlog:
+            updates["sprint_week"] = None
 
-    if old_sprint_week:
-        sprint = db.query(WeeklySprint).filter(
-            WeeklySprint.cycle_id == old_cycle_id,
-            WeeklySprint.week_number == old_sprint_week
-        ).first()
-        if sprint:
-            sprint_qs = db.query(Task).filter(
-                Task.cycle_id == old_cycle_id,
-                Task.sprint_week == old_sprint_week
-            )
-            sprint.planned_count = sprint_qs.count()
-            sprint.completed_count = sprint_qs.filter(Task.is_completed == True).count()
-            if sprint.planned_count:
-                sprint.execution_score = round(sprint.completed_count / sprint.planned_count * 100, 1)
-            db.commit()
+        for k, v in updates.items():
+            setattr(task, k, v)
+
+        if old_sprint_week:
+            sprint = db.query(WeeklySprint).filter(
+                WeeklySprint.cycle_id == old_cycle_id,
+                WeeklySprint.week_number == old_sprint_week
+            ).first()
+            if sprint:
+                sprint_qs = db.query(Task).filter(
+                    Task.cycle_id == old_cycle_id,
+                    Task.sprint_week == old_sprint_week
+                )
+                sprint.planned_count = sprint_qs.count()
+                sprint.completed_count = sprint_qs.filter(Task.is_completed == True).count()
+                sprint.execution_score = (
+                    round(sprint.completed_count / sprint.planned_count * 100, 1)
+                    if sprint.planned_count else None
+                )
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     db.refresh(task)
     return task
